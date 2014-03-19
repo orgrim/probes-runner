@@ -1,0 +1,18 @@
+[main]
+interval = 60
+logfile = /var/log/probes_runner.log
+
+[collector]
+url = http://localhost:3000
+key = somekey
+
+[cluster1]
+;host = 
+;port =
+;user =
+;password =
+dbnames = db1, db2
+
+[cluster2]
+port = 5433
+dbnames = probes
