@@ -31,7 +31,6 @@ import getopt
 import logging
 import ConfigParser
 import imp
-import psycopg2
 import time
 from StringIO import StringIO
 
@@ -202,6 +201,14 @@ def prepare_sql_run(probes, conninfos):
             break
     if not has_sql:
         logging.info("No probes require connections to PostgreSQL")
+        return []
+
+    # psycopg2 is the only non standard module we need
+    try:
+        import psycopg2
+        global psycopg2
+    except ImportError:
+        logging.error("The psycopg2 module is required to access PostgreSQL. SQL probes won't be run.")
         return []
 
     # Build a list of dicts with connection information
