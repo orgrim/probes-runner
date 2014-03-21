@@ -349,6 +349,13 @@ def sys_run(probes):
     return output
 
 # output functions
+def clean_conninfos(conns):
+    """Remove password from the dsn."""
+    connections = [dict(x) for x in conns]
+    for c in connections:
+        c['dsn'] = re.sub(r"password=('(\\'|[\w\s])*'|\w*)\s?", '', c['dsn']).strip()
+    return connections
+
 def send_output(url, key, output):
     """Send data to the target URL."""
     data = { "key": key,
@@ -638,12 +645,16 @@ def main():
     if options['daemon']:
         daemonize(pidfile)
 
+    # Prepare mandatory data we need to send so that the collector can
+    # connect the dots
     hostname = os.uname()[1]
+    conninfos = clean_conninfos(connections)
 
     while True:
         # Gather information by running all probes
         output = {}
         output['host'] = hostname
+        output['conninfos'] = conninfos
         output['clusters'] = sql_run(connections)
         output['system'] = sys_run(sys_probes)
 
