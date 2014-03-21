@@ -464,6 +464,7 @@ def usage(exit_code):
     print """options:
   -c, --config=FILE        configuration file
 
+  -i, --interval=SECONDS   probing time interval in seconds
   -F, --foreground         do not detach from console
   -f, --pid-file=FILE      path to the pid file
 
@@ -486,8 +487,8 @@ def cli_options():
     try:
         opts, args = getopt.getopt(sys.argv[1:],
                                    "c:i:Ff:vh",
-                                   ["config=", "foreground", "pid-file=",
-                                    "verbose", "help"])
+                                   ["config=", "interval=", "foreground",
+                                    "pid-file=", "verbose", "help"])
     except getopt.GetoptError, e:
         sys.stderr.write("ERROR: %s " % str(e))
         usage(2)
@@ -495,6 +496,11 @@ def cli_options():
     for opt, arg in opts:
         if opt in ("-c", "--config"):
             options['configfile'] = arg
+        if opt in ("-i", "--interval"):
+            try:
+                options['interval'] = int(arg)
+            except ValueError:
+                sys.stderr.write("WARNING: bad interval value: %r. Skipped.\n" % arg)
         if opt in ("-F", "--foreground"):
             options['daemon'] = False
         if opt in ("-f", "--pid-file"):
@@ -632,12 +638,6 @@ def main():
     if options['daemon']:
         daemonize(pidfile)
 
-
-    # Loop
-    # - get the data from postgres
-    # - prepare the out struct
-    # - send the out struct
-
     hostname = os.uname()[1]
 
     while True:
@@ -650,7 +650,8 @@ def main():
         # Send the result to the url of the collector
         send_output(options['url'], options['key'], output)
 
-        time.sleep(2)
+        logging.debug("Sleeping %d seconds", options['interval'])
+        time.sleep(options['interval'])
 
 
 if __name__ == "__main__":
