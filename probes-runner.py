@@ -33,6 +33,7 @@ import ConfigParser
 import imp
 import time
 from StringIO import StringIO
+import urllib
 
 # Globals
 probes_path = [ os.path.expanduser('~/.probes'),
@@ -347,6 +348,20 @@ def sys_run(probes):
 
     return output
 
+# output functions
+def send_output(url, key, output):
+    """Send data to the target URL."""
+    data = { "key": key,
+             "data": output }
+    try:
+        r = urllib.urlopen(url, urllib.urlencode(data))
+        if hasattr(r, 'getcode'):
+            if r.getcode() != 200:
+                logging.error("Could not send output to %s: %d", url, r.getcode())
+    except IOError, e:
+        logging.error("Could not send output to %s %s", url, str(e))
+
+
 
 # daemon related functions
 def write_pid(pid, pidfile):
@@ -626,10 +641,14 @@ def main():
     hostname = os.uname()[1]
 
     while True:
+        # Gather information by running all probes
         output = {}
         output['host'] = hostname
         output['clusters'] = sql_run(connections)
         output['system'] = sys_run(sys_probes)
+
+        # Send the result to the url of the collector
+        send_output(options['url'], options['key'], output)
 
         time.sleep(2)
 
