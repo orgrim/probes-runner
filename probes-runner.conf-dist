@@ -1,9 +1,11 @@
 [main]
 interval = 60
 logfile = /var/log/probes_runner.log
+;probes = sysinfo, bgwriter
+probes = *
 
 [collector]
-url = http://localhost:3000
+url = http://localhost:5000
 key = somekey
 
 [cluster1]
