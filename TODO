@@ -1,6 +1,6 @@
 v1
 + run non sql probes
-- send output
++ send output
 - reload on SIGHUP
 - port all probes
-- mandatory? sysinfo probe
+- sysinfo probe

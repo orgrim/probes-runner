@@ -34,6 +34,7 @@ import imp
 import time
 from StringIO import StringIO
 import urllib
+import json
 
 # Globals
 probes_path = [ os.path.expanduser('~/.probes'),
@@ -358,8 +359,9 @@ def clean_conninfos(conns):
 
 def send_output(url, key, output):
     """Send data to the target URL."""
+    
     data = { "key": key,
-             "data": output }
+             "data": json.dumps(output) }
     try:
         r = urllib.urlopen(url, urllib.urlencode(data))
         if hasattr(r, 'getcode'):
