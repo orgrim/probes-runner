@@ -349,6 +349,15 @@ def sys_run(probes):
 
     return output
 
+class OutputEncoder(json.JSONEncoder):
+    """Tell json that probe objects should be encoded as strings using their
+    name.
+    """
+    def default(self, obj):
+        if isinstance(obj, Probe):
+            return repr(obj)
+        return json.JSONEncoder.default(self, obj)
+
 # output functions
 def clean_conninfos(conns):
     """Remove password from the dsn."""
@@ -361,7 +370,7 @@ def send_output(url, key, output):
     """Send data to the target URL."""
     
     data = { "key": key,
-             "data": json.dumps(output) }
+             "data": json.dumps(output, cls=OutputEncoder) }
     try:
         r = urllib.urlopen(url, urllib.urlencode(data))
         if hasattr(r, 'getcode'):
