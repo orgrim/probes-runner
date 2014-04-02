@@ -169,7 +169,7 @@ def load_probes(names):
             continue
 
         except ImportError:
-            logging.warning("Probe '%s' not found", n)
+            pass
 
         # When the probe is not found try to create an object from a
         # local class. This allow to overwrite probes bundled in this
@@ -179,6 +179,9 @@ def load_probes(names):
             probes.append(po)
 
             logging.info("Loaded probe: %s", po.get_name())
+            continue
+
+        logging.warning("Probe '%s' not found", n)
 
     return probes
 
