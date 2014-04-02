@@ -2,5 +2,8 @@ v1
 + run non sql probes
 + send output
 - reload on SIGHUP
-- port all probes
++ add all probes
 + sysinfo probe
+- document probes
+- add an options to list available one with the doc
+- improve info and debug messages
