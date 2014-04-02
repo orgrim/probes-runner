@@ -156,18 +156,29 @@ def load_probes(names):
             # use imp.load_module() because the parent classes would
             # not be found in the namespace of the module. So we
             # execute the contents of the plugin directly.
-            execfile(pathname, globals())
+            execfile(pathname, globals(), locals())
 
             # We only need an object: remove the class to avoid
             # conflicts after we got it.
             po = eval(probe + "()")
-            del(probe)
             probes.append(po)
             
-            logging.info("Loaded probe: %s", po.get_name())
+            logging.info("Loaded probe from plugin: %s", po.get_name())
+
+            # Skip the eval of the bundled probe
+            continue
 
         except ImportError:
             logging.warning("Probe '%s' not found", n)
+
+        # When the probe is not found try to create an object from a
+        # local class. This allow to overwrite probes bundled in this
+        # script with plugins
+        if probe in globals().keys():
+            po = eval(probe + "()")
+            probes.append(po)
+
+            logging.info("Loaded probe: %s", po.get_name())
 
     return probes
 
@@ -188,7 +199,15 @@ def find_all_probes(dirs):
         except OSError, e:
             pass
 
-    return probes
+    # Append all bundled probes to the list
+    r = re.compile(r'^probe_(\w+)$')
+    for v in globals().keys():
+        m = r.search(v)
+        if m is not None:
+            probes.append(m.group(1))
+
+    # Deduplicate the result
+    return list(set(probes))
 
 
 # database related functions
@@ -349,6 +368,7 @@ def sys_run(probes):
 
     return output
 
+# output functions
 class OutputEncoder(json.JSONEncoder):
     """Tell json that probe objects should be encoded as strings using their
     name.
@@ -358,7 +378,6 @@ class OutputEncoder(json.JSONEncoder):
             return repr(obj)
         return json.JSONEncoder.default(self, obj)
 
-# output functions
 def clean_conninfos(conns):
     """Remove password from the dsn."""
     connections = [dict(x) for x in conns]
