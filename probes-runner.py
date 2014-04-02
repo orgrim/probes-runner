@@ -103,7 +103,6 @@ class SysProbe(Probe):
 
         return True
 
-
 # postgres probe base class
 class PgProbe(Probe):
     min_version = None
@@ -138,6 +137,152 @@ class PgProbe(Probe):
 
         cur.close()
         return output
+
+# Bundled System probes
+class probe_sysinfo(SysProbe):
+    system = 'Linux'
+
+    def run(self):
+        """Gather information in this box."""
+        kernel, node, version, extra, arch = os.uname()
+        sysinfo = { "host": node, "kernel": kernel, "version": version,
+                    "architecture": arch }
+
+        # use lscpu to get most of the information
+        import subprocess
+        lscpu = subprocess.Popen("/usr/bin/lscpu", stdout=subprocess.PIPE)
+        try:
+            out = lscpu.communicate()[0]
+            if lscpu.returncode == 0:
+                # Parse output
+                for line in out.splitlines():
+                    m = re.match(r'CPU\(s\):\s+(\d+)$', line)
+                    if m:
+                        sysinfo["cpu_number"] = m.group(1)
+                    
+                    m = re.match(r'Socket\(s\):\s+(\d+)$', line)
+                    if m:
+                        sysinfo["cpu_sockets"] = m.group(1)
+
+                    m = re.match(r'Core\(s\) per socket:\s+(\d+)$', line)
+                    if m:
+                        sysinfo["cpu_cores"] = m.group(1)
+
+                    m = re.match(r'Thread\(s\) per core:\s+(\d+)$', line)
+                    if m:
+                        sysinfo["cpu_threads"] = m.group(1)
+
+                    m = re.match(r'CPU MHz:\s+(\d+)[\.\d]*$', line)
+                    if m:
+                        sysinfo["cpu_frequency"] = m.group(1)
+            else:
+                logging.warning("lscpu failed: %d", lscpu.returncode)
+                               
+        except OSError, e:
+            logging.error("[sysinfo] Could not run lscpu: %s", str(e))
+
+        # get the model name string from /proc/cpuinfo
+        cpuinfo = open("/proc/cpuinfo")
+        m = re.search(r'^model name\s+:\s+(.+)$', cpuinfo.read(), re.M)
+        if m:
+            sysinfo["cpu_model"] = m.group(1)
+        cpuinfo.close()
+
+        # Memory
+        free = subprocess.Popen(["free", "-k"], stdout=subprocess.PIPE)
+        try:
+            out = free.communicate()[0]
+            if free.returncode == 0:
+                # total memory is the second column of the second line
+                sysinfo["memory_size"] = out.splitlines()[1].split()[1]
+                
+                # total swap is the second column of the fourth line
+                sysinfo["swap"] = out.splitlines()[3].split()[1]
+            else:
+                logging.warning("[sysinfo] free -k failed: %d", free.returncode)
+        except OSError, e:
+            logging.error("[sysinfo] Could not run free: %s", str(e))
+
+        # Filesystems
+        df = subprocess.Popen(["df", "-k"], stdout=subprocess.PIPE)
+        dfmap = {}
+        try:
+            out = df.communicate()[0]
+            if df.returncode == 0:
+                for l in out.splitlines()[1:]:
+                    # hash on "mount point" -> "size"
+                    dfmap[l.split()[5]] = l.split()[1]
+            else:
+                logging.warning("[sysinfo] df -k failed: %d", df.returncode)
+        except OSError, e:
+            logging.error("[sysinfo] Could not run df: %s", str(e))
+
+        mount = subprocess.Popen("mount", stdout=subprocess.PIPE)
+        fs = []
+        try:
+            out = mount.communicate()[0]
+            if mount.returncode == 0:
+                # build a list of dicts
+                for l in out.splitlines():
+                    c = l.split()
+                    m = re.match(r'^/dev/', c[0])
+                    if m:
+                        fs.append({"device": c[0], "fstype": c[4],
+                                   "mount_point": c[2], "mount_options": c[5][1:-1],
+                                   "size": dfmap[c[2]]})
+            else:
+                logging.warning("[sysinfo] mount failed: %d", mount.returncode)
+        except OSError, e:
+            logging.error("[sysinfo] Could not run mount: %s", str(e))
+        sysinfo["fs"] = fs
+
+        logging.debug("[sysinfo] sysinfo: %r", sysinfo)
+
+        return sysinfo
+
+
+# Bundled PostgreSQL probes
+class probe_database_stats83(PgProbe):
+    level = 'cluster'
+    min_version = 803
+    max_version = 900
+    sql = """SELECT date_trunc('seconds', current_timestamp) as datetime,
+      datname, numbackends,  xact_commit, xact_rollback, blks_read, blks_hit,
+      tup_returned, tup_fetched,  tup_inserted, tup_updated, tup_deleted,
+      pg_database_size(datid) AS size
+    FROM pg_stat_database"""
+
+class probe_database_stats91(PgProbe):
+    level = 'cluster'
+    min_version = 901
+    max_version = 901
+    sql = """SELECT date_trunc('seconds', current_timestamp) as datetime,
+      datname, numbackends,  xact_commit, xact_rollback, blks_read, blks_hit,
+      tup_returned, tup_fetched,  tup_inserted, tup_updated, tup_deleted,
+      conflicts, pg_database_size(datid) AS size
+    FROM pg_stat_database"""
+
+class probe_database_stats92(PgProbe):
+    level = 'cluster'
+    min_version = 902
+    max_version = None
+    sql = """SELECT date_trunc('seconds', current_timestamp) as datetime,
+      datname, numbackends,  xact_commit, xact_rollback, blks_read, blks_hit,
+      tup_returned, tup_fetched,  tup_inserted, tup_updated, tup_deleted,
+      conflicts, temp_files, temp_bytes, deadlocks, blk_read_time,
+      blk_write_time, pg_database_size(datid) AS size
+    FROM pg_stat_database"""
+
+class probe_tables_stats(PgProbe):
+    level = 'db'
+    min_version = 803
+    max_version = None
+    sql = """SELECT date_trunc('seconds', current_timestamp) as datetime,
+      schemaname, relname, seq_scan, seq_tup_read, idx_scan, idx_tup_fetch,
+      n_tup_ins, n_tup_upd, n_tup_del, n_tup_hot_upd, n_live_tup, n_dead_tup,
+      last_vacuum, last_autovacuum, last_analyze, last_autoanalyze
+    FROM pg_stat_user_tables"""
+
 
 # plugins functions
 def load_probes(names):
