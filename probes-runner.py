@@ -236,8 +236,6 @@ class probe_sysinfo(SysProbe):
             logging.error("[sysinfo] Could not run mount: %s", str(e))
         sysinfo["fs"] = fs
 
-        logging.debug("[sysinfo] sysinfo: %r", sysinfo)
-
         return sysinfo
 
 
@@ -273,6 +271,58 @@ class probe_database_stats92(PgProbe):
       blk_write_time, pg_database_size(datid) AS size
     FROM pg_stat_database"""
 
+class probe_bgwriter_stats(PgProbe):
+    level = 'cluster'
+    min_version = 803
+    max_version = 900
+    sql = """SELECT date_trunc('seconds', current_timestamp) as datetime,
+      checkpoints_timed, checkpoints_req, buffers_checkpoint, buffers_clean,
+      maxwritten_clean, buffers_backend, buffers_alloc
+    FROM pg_stat_bgwriter"""
+
+class probe_bgwriter_stats91(PgProbe):
+    level = 'cluster'
+    min_version = 901
+    max_version = 901
+    sql = """SELECT date_trunc('seconds', current_timestamp) as datetime,
+      checkpoints_timed, checkpoints_req, buffers_checkpoint, buffers_clean,
+      maxwritten_clean, buffers_backend, buffers_backend_fsync, buffers_alloc
+    FROM pg_stat_bgwriter"""
+
+class probe_bgwriter_stats92(PgProbe):
+    level = 'cluster'
+    min_version = 902
+    max_version = None
+    sql = """SELECT date_trunc('seconds', current_timestamp) as datetime,
+      checkpoints_timed, checkpoints_req, checkpoint_write_time, checkpoint_sync_time,
+      buffers_checkpoint, buffers_clean, maxwritten_clean, buffers_backend,
+      buffers_backend_fsync, buffers_alloc
+    FROM pg_stat_bgwriter"""
+
+class probe_connections(PgProbe):
+    level = 'cluster'
+    min_version = 803
+    max_version = 901
+    sql = """SELECT date_trunc('seconds', current_timestamp) as datetime,
+      count(*) AS total, 
+      coalesce(SUM((current_query NOT IN ('<IDLE>','<IDLE> in transaction'))::integer), 0) AS active, 
+      coalesce(SUM(waiting::integer), 0) AS waiting,
+      coalesce(SUM((current_query='<IDLE> in transaction')::integer), 0) AS idle_in_xact
+    FROM pg_stat_activity
+    WHERE procpid <> pg_backend_pid()"""
+
+class probe_connections92(PgProbe):
+    level = 'cluster'
+    min_version = 902
+    max_version = None
+    sql = """SELECT date_trunc('seconds', current_timestamp) as datetime,
+      count(*) AS total, 
+      coalesce(SUM((state = 'active')::integer), 0) AS active, 
+      coalesce(SUM(waiting::integer), 0) AS waiting,
+      coalesce(SUM((state = 'idle in transaction')::integer), 0) AS idle_in_xact
+    FROM pg_stat_activity
+    WHERE pid <> pg_backend_pid()"""
+
 class probe_tables_stats(PgProbe):
     level = 'db'
     min_version = 803
@@ -281,8 +331,33 @@ class probe_tables_stats(PgProbe):
       schemaname, relname, seq_scan, seq_tup_read, idx_scan, idx_tup_fetch,
       n_tup_ins, n_tup_upd, n_tup_del, n_tup_hot_upd, n_live_tup, n_dead_tup,
       last_vacuum, last_autovacuum, last_analyze, last_autoanalyze
-    FROM pg_stat_user_tables"""
+    FROM pg_stat_all_tables"""
+    
+class probe_tables_io_stats(PgProbe):
+    level = 'db'
+    min_version = 803
+    max_version = None
+    sql = """SELECT date_trunc('seconds', current_timestamp) AS datetime, schemaname,
+      relname, heap_blks_read, heap_blks_hit, idx_blks_read, idx_blks_hit,
+      toast_blks_read, toast_blks_hit, tidx_blks_read, tidx_blks_hit
+    FROM pg_statio_all_tables"""
 
+class probe_functions(PgProbe):
+    level = 'db'
+    min_version = 804
+    max_version = 901
+    sql = """SELECT date_trunc('seconds', current_timestamp) AS datetime, schemaname,
+      funcname, calls, total_time, self_time
+    FROM pg_stat_user_functions"""
+
+class probe_functions92(PgProbe):
+    level = 'db'
+    min_version = 902
+    max_version = None
+    # *_time fields are double precision in 9.2 not bigint
+    sql = """SELECT date_trunc('seconds', current_timestamp) AS datetime, schemaname,
+      funcname, calls, total_time, self_time
+    FROM pg_stat_user_functions"""
 
 # plugins functions
 def load_probes(names):
