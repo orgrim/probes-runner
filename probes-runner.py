@@ -176,7 +176,7 @@ class probe_sysinfo(SysProbe):
                     if m:
                         sysinfo["cpu_frequency"] = m.group(1)
             else:
-                logging.warning("lscpu failed: %d", lscpu.returncode)
+                logging.warning("[sysinfo] lscpu failed: %d", lscpu.returncode)
                                
         except OSError, e:
             logging.error("[sysinfo] Could not run lscpu: %s", str(e))

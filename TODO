@@ -3,4 +3,4 @@ v1
 + send output
 - reload on SIGHUP
 - port all probes
-- sysinfo probe
++ sysinfo probe
