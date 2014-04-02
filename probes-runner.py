@@ -565,19 +565,20 @@ def sql_run(dbinfos):
 
         dbconn.autocommit = True
 
-        try:
-            for p in dbinfo['probes']:
-                probe_key = p.get_name()
+        for p in dbinfo['probes']:
+            probe_key = p.get_name()
+            try:
                 result = p.run(dbconn)
                 output[dbinfo['cluster']][dbinfo['db']][probe_key] = result
+            except psycopg2.Error, e:
+                output[dbinfo['cluster']][dbinfo['db']][probe_key] = None
+                logging.warning("Could not run probe '%s' on '%s' db=%s",
+                                str(p), dbinfo['cluster'], dbinfo['db'])
+                for l in e.pgerror.splitlines():
+                    logging.warning(l)
+                continue
 
-        except psycopg2.Error, e:
-            logging.warning("Could not run probe %s on [%s] %s: %s",
-                            str(p), dbinfo['cluster'], dbinfo['db'], e.pgerror)
-            continue
-            
-        finally:
-            dbconn.close()
+        dbconn.close()
             
     return output
 
