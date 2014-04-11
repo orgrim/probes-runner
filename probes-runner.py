@@ -92,7 +92,7 @@ class SysProbe(Probe):
             if self.system != os.uname()[0]:
                 return False
 
-        version = [ int(x) for x in re.sub(r'-.*$', '', os.uname()[2]).split('.') ]
+        version = [ int(x) for x in re.sub(r'[-_].*$', '', os.uname()[2]).split('.') ]
         if self.min_version is not None:
             if version[0:len(self.min_version)] < self.min_version:
                 return False
@@ -203,7 +203,12 @@ class probe_sysinfo_linux(SysProbe):
         except OSError, e:
             logging.error("[sysinfo] Could not run free: %s", str(e))
 
-        # Filesystems
+        return sysinfo
+
+class probe_fsinfo(SysProbe):
+
+    def run(self):
+        import subprocess
         df = subprocess.Popen(["df", "-k"], stdout=subprocess.PIPE)
         dfmap = {}
         try:
@@ -234,9 +239,8 @@ class probe_sysinfo_linux(SysProbe):
                 logging.warning("[sysinfo] mount failed: %d", mount.returncode)
         except OSError, e:
             logging.error("[sysinfo] Could not run mount: %s", str(e))
-        sysinfo["fs"] = fs
 
-        return sysinfo
+        return fs
 
 
 # Bundled PostgreSQL probes
@@ -614,9 +618,12 @@ def send_output(url, key, output):
     
     data = { "key": key,
              "data": json.dumps(output, cls=OutputEncoder) }
+    
+    logging.debug("Sending output to %s", url)
     try:
         r = urllib.urlopen(url, urllib.urlencode(data))
         if hasattr(r, 'getcode'):
+            logging.debug("Server replied with status %s", r.getcode())
             if r.getcode() != 200:
                 logging.error("Could not send output to %s: %d", url, r.getcode())
     except IOError, e:
