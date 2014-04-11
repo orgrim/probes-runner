@@ -879,6 +879,11 @@ def main():
     # Setup the logger
     setup_logger(options['logfile'], options['daemon'], options['debug'])
 
+    # Probing interval must be at least 10 seconds
+    if options['interval'] < 10:
+        logging.warning("Interval too short: %d, forcing to 10 seconds", options['interval'])
+        options['interval'] = 10
+
     # Before loading all the required plugins, check if we have
     # something to load and run.
     if 'probes' not in options.keys():
