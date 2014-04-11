@@ -497,7 +497,7 @@ def prepare_sql_run(probes, conninfos):
                 cur.close()
                 
                 version = dbconn.server_version / 100
-                conn['cluster_version_major_num'] = version
+                conn['cluster_version_num'] = dbconn.server_version
                 for p in probes:
                     if isinstance(p, PgProbe) and p.check(version) and ((p.level == "cluster" and allow_cluster_level) or p.level == "db"):
                         conn['probes'].append(p)
