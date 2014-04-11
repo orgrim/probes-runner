@@ -139,7 +139,7 @@ class PgProbe(Probe):
         return output
 
 # Bundled System probes
-class probe_sysinfo(SysProbe):
+class probe_sysinfo_linux(SysProbe):
     system = 'Linux'
 
     def run(self):
@@ -194,7 +194,7 @@ class probe_sysinfo(SysProbe):
             out = free.communicate()[0]
             if free.returncode == 0:
                 # total memory is the second column of the second line
-                sysinfo["memory_size"] = out.splitlines()[1].split()[1]
+                sysinfo["memory"] = out.splitlines()[1].split()[1]
                 
                 # total swap is the second column of the fourth line
                 sysinfo["swap"] = out.splitlines()[3].split()[1]
